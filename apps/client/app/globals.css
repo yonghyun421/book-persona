@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: radial-gradient(1200px 800px at 10% -10%, #fff7ec 0%, transparent 60%),
+    radial-gradient(900px 700px at 90% 10%, #eaf0ff 0%, transparent 55%),
+    #f6f3ee;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-60%);
+  }
+  100% {
+    transform: translateX(160%);
+  }
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.shimmer-bar {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 92, 56, 0.45), transparent);
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+.typing-cursor {
+  display: inline-block;
+  width: 8px;
+  margin-left: 4px;
+  background: currentColor;
+  height: 1em;
+  animation: blink 1s step-end infinite;
+}
