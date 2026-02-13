@@ -18,6 +18,9 @@ type ShareCardPayload = {
   brandLabel?: string
   backgroundDataUrl?: string
   genres?: string[]
+  ratio?: "1:1" | "4:5" | "9:16"
+  format?: "png" | "jpeg"
+  scale?: 1 | 2
 }
 
 export async function POST(req: Request) {
@@ -34,12 +37,31 @@ export async function POST(req: Request) {
     payload = defaultPayload
   }
 
+  const ratio = payload.ratio ?? "1:1"
+  const scale = payload.scale ?? 1
+  const format = payload.format ?? "png"
+  const size =
+    ratio === "1:1"
+      ? { width: 960, height: 960 }
+      : ratio === "4:5"
+        ? { width: 960, height: 1200 }
+        : { width: 900, height: 1600 }
+
+  const responseOptions: Record<string, unknown> = {
+    width: size.width * scale,
+    height: size.height * scale,
+    headers: { "Content-Type": format === "jpeg" ? "image/jpeg" : "image/png" }
+  }
+  if (format === "jpeg") {
+    responseOptions.format = "jpeg"
+  }
+
   return new ImageResponse(
     (
       <div
         style={{
-          width: 960,
-          height: 960,
+          width: size.width,
+          height: size.height,
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
@@ -128,10 +150,7 @@ export async function POST(req: Request) {
         </div>
       </div>
     ),
-    {
-      width: 960,
-      height: 960
-    }
+    responseOptions as { width: number; height: number }
   )
 }
 
@@ -149,14 +168,23 @@ export async function GET(req: Request) {
         keywords: string[]
         genres?: string[]
         backgroundDataUrl?: string
+        ratio?: "1:1" | "4:5" | "9:16"
       }
+
+      const ratio = share.ratio ?? "1:1"
+      const size =
+        ratio === "1:1"
+          ? { width: 960, height: 960 }
+          : ratio === "4:5"
+            ? { width: 960, height: 1200 }
+            : { width: 900, height: 1600 }
 
       return new ImageResponse(
         (
           <div
             style={{
-              width: 960,
-              height: 960,
+              width: size.width,
+              height: size.height,
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
@@ -246,8 +274,8 @@ export async function GET(req: Request) {
           </div>
         ),
         {
-          width: 960,
-          height: 960
+          width: size.width,
+          height: size.height
         }
       )
     }
@@ -260,12 +288,20 @@ export async function GET(req: Request) {
     ? keywordsParam.split(",").map((item) => item.trim()).filter(Boolean)
     : defaultPayload.keywords
 
+  const ratio = (url.searchParams.get("ratio") as "1:1" | "4:5" | "9:16") || "1:1"
+  const size =
+    ratio === "1:1"
+      ? { width: 960, height: 960 }
+      : ratio === "4:5"
+        ? { width: 960, height: 1200 }
+        : { width: 900, height: 1600 }
+
   return new ImageResponse(
     (
       <div
         style={{
-          width: 960,
-          height: 960,
+          width: size.width,
+          height: size.height,
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
@@ -339,8 +375,8 @@ export async function GET(req: Request) {
       </div>
     ),
     {
-      width: 960,
-      height: 960
+      width: size.width,
+      height: size.height
     }
   )
 }

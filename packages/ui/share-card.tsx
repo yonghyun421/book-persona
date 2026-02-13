@@ -32,7 +32,7 @@ export function ShareCard({
 
   return (
     <div
-      className={`relative flex h-[960px] w-[960px] flex-col justify-between overflow-hidden rounded-[48px] p-16 text-white ${backgroundClassName}`}
+      className={`relative flex flex-col justify-between overflow-hidden rounded-[48px] p-16 text-white ${backgroundClassName}`}
       style={{
         ...(backgroundImage
           ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: "cover" }

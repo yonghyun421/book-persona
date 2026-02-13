@@ -12,6 +12,27 @@ body {
     #f6f3ee;
 }
 
+.fun-card {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.8));
+}
+
+.fun-card::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(circle at 20% 10%, rgba(255, 92, 56, 0.18), transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(42, 92, 255, 0.18), transparent 55%),
+    radial-gradient(circle at 40% 80%, rgba(255, 202, 40, 0.18), transparent 55%);
+  z-index: 0;
+}
+
+.fun-card > * {
+  position: relative;
+  z-index: 1;
+}
+
 @keyframes shimmer {
   0% {
     transform: translateX(-60%);
@@ -29,6 +50,25 @@ body {
   50% {
     opacity: 1;
   }
+}
+
+@keyframes slideFade {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.step-enter {
+  animation: slideFade 0.45s ease both;
+}
+
+.page-enter {
+  animation: slideFade 0.6s ease both;
 }
 
 .shimmer-bar {

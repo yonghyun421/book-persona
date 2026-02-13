@@ -7,6 +7,7 @@ type BackgroundInput = {
   keywords?: string[]
   mood?: string
   genres?: string[]
+  bookKeywords?: string[]
 }
 
 export async function POST(req: Request) {
@@ -15,7 +16,12 @@ export async function POST(req: Request) {
     return new Response("Missing GEMINI_API_KEY", { status: 500 })
   }
 
-  const input = (await req.json()) as BackgroundInput
+  let input: BackgroundInput
+  try {
+    input = (await req.json()) as BackgroundInput
+  } catch {
+    return new Response("Invalid JSON body", { status: 400 })
+  }
 
   const genreHints: Record<string, string> = {
     "소설": "moody literary atmosphere, soft grain, subtle shadows",
@@ -51,27 +57,57 @@ export async function POST(req: Request) {
     .filter(Boolean)
     .join("; ")
 
-  const prompt = `Create an abstract, editorial-style background image for a reading persona card.
+  const primaryPrompt = `Create an abstract, editorial-style background image for a reading persona card.
 No text, no logos, no faces. Use cinematic lighting and soft gradients.
 Style cues: ${genrePrompt || "balanced modern editorial aesthetic"}.
 Color palette: ${palettePrompt || "balanced warm-neutral palette"}.
-Vibe keywords: ${[input.title, ...(input.keywords ?? []), input.mood].filter(Boolean).join(", ")}`
+Vibe keywords: ${[input.title, ...(input.keywords ?? []), input.mood].filter(Boolean).join(", ")}.
+Reading motifs: ${(input.bookKeywords ?? []).join(", ") || "literary texture, quiet rhythm, paper and ink mood"}`
 
   const ai = new GoogleGenAI({ apiKey })
+  const primaryModel = process.env.GEMINI_IMAGE_MODEL ?? "gemini-2.5-flash-image"
+  const fallbackModels = ["gemini-3-pro-image-preview"]
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-image",
-    contents: [{ role: "user", parts: [{ text: prompt }] }]
-  })
+  async function generateImage(prompt: string, model: string) {
+    const response = await ai.models.generateContent({
+      model,
+      contents: [{ role: "user", parts: [{ text: prompt }] }]
+    })
 
-  const parts = response.candidates?.[0]?.content?.parts ?? []
-  const inline = parts.find((part) => part.inlineData?.data)
+    const parts = response.candidates?.[0]?.content?.parts ?? []
+    const inline = parts.find((part) => part.inlineData?.data)
 
-  if (!inline?.inlineData?.data || !inline.inlineData.mimeType) {
-    return new Response("No image returned", { status: 500 })
+    if (!inline?.inlineData?.data || !inline.inlineData.mimeType) {
+      return null
+    }
+
+    return {
+      dataUrl: `data:${inline.inlineData.mimeType};base64,${inline.inlineData.data}`,
+      mimeType: inline.inlineData.mimeType
+    }
   }
 
-  const dataUrl = `data:${inline.inlineData.mimeType};base64,${inline.inlineData.data}`
+  try {
+    const primary = await generateImage(primaryPrompt, primaryModel)
+    if (primary) {
+      return Response.json(primary)
+    }
 
-  return Response.json({ dataUrl, mimeType: inline.inlineData.mimeType })
+    const fallbackPrompt = `Create a minimalist abstract background for a reading persona card.
+No text, no logos, no faces. Soft gradients, subtle grain, gentle lighting.
+Keep it calm and atmospheric, avoid busy details.`
+
+    for (const model of fallbackModels) {
+      const fallback = await generateImage(fallbackPrompt, model)
+      if (fallback) {
+        return Response.json(fallback)
+      }
+    }
+
+    return new Response("No image returned", { status: 500 })
+  } catch (error) {
+    console.error("Background generation failed:", error)
+    const message = error instanceof Error ? error.message : "Unknown error"
+    return new Response(`Background generation failed: ${message}`, { status: 500 })
+  }
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 
 const genreOptions = [
@@ -22,77 +22,181 @@ const selectionOptions = ["추천", "표지/디자인", "리뷰/평점", "작가
 const placeOptions = ["집", "카페", "출퇴근/이동 중", "도서관", "어디서나"]
 const frequencyOptions = ["주 1권 이상", "월 1~2권", "분기 1~2권", "가끔", "거의 안 읽음"]
 
+const steps = [
+  {
+    id: "genres",
+    title: "선호 장르",
+    description: "중복 선택 가능",
+    render: (state: SurveyState, setState: (next: Partial<SurveyState>) => void) => (
+      <div className="mt-6 flex flex-wrap gap-2">
+        {genreOptions.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() =>
+              setState({
+                genres: state.genres.includes(option)
+                  ? state.genres.filter((g) => g !== option)
+                  : [...state.genres, option]
+              })
+            }
+            className={`rounded-full border px-4 py-2 text-sm transition ${
+              state.genres.includes(option)
+                ? "border-ink bg-ink text-white"
+                : "border-line bg-white/70 text-ink hover:border-ink"
+            }`}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    ),
+    isValid: (state: SurveyState) => state.genres.length > 0
+  },
+  {
+    id: "bookKeywords",
+    title: "최근 인상 깊었던 책 키워드",
+    description: "쉼표로 구분해서 입력해주세요.",
+    render: (state: SurveyState, setState: (next: Partial<SurveyState>) => void) => (
+      <div className="mt-6">
+        <input
+          value={state.bookKeywords}
+          onChange={(event) => setState({ bookKeywords: event.target.value })}
+          className="w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
+          placeholder="고독, 성장, 데이터"
+        />
+      </div>
+    ),
+    isValid: (state: SurveyState) => state.bookKeywords.trim().length > 0
+  },
+  {
+    id: "time",
+    title: "읽는 시간대",
+    description: "가장 몰입이 잘 되는 시간",
+    options: timeOptions,
+    isValid: (state: SurveyState) => Boolean(state.time)
+  },
+  {
+    id: "style",
+    title: "읽는 방식",
+    description: "당신의 독서 리듬",
+    options: styleOptions,
+    isValid: (state: SurveyState) => Boolean(state.style)
+  },
+  {
+    id: "purpose",
+    title: "독서 목적",
+    description: "현재 가장 중요한 목적",
+    options: purposeOptions,
+    isValid: (state: SurveyState) => Boolean(state.purpose)
+  },
+  {
+    id: "selection",
+    title: "책 선택 기준",
+    description: "구매/선택 시 중요 요소",
+    options: selectionOptions,
+    isValid: (state: SurveyState) => Boolean(state.selection)
+  },
+  {
+    id: "place",
+    title: "독서 장소",
+    description: "가장 자주 읽는 공간",
+    options: placeOptions,
+    isValid: (state: SurveyState) => Boolean(state.place)
+  },
+  {
+    id: "frequency",
+    title: "독서 빈도",
+    description: "평균적인 읽기 빈도",
+    options: frequencyOptions,
+    isValid: (state: SurveyState) => Boolean(state.frequency)
+  }
+]
+
+type SurveyState = {
+  genres: string[]
+  bookKeywords: string
+  time: string
+  style: string
+  purpose: string
+  selection: string
+  place: string
+  frequency: string
+}
+
+const defaultState: SurveyState = {
+  genres: [],
+  bookKeywords: "",
+  time: "",
+  style: "",
+  purpose: "",
+  selection: "",
+  place: "",
+  frequency: ""
+}
+
 export default function SurveyPage() {
   const router = useRouter()
-  const [genres, setGenres] = useState<string[]>([])
-  const [bookKeywords, setBookKeywords] = useState("")
-  const [time, setTime] = useState("")
-  const [style, setStyle] = useState("")
-  const [purpose, setPurpose] = useState("")
-  const [selection, setSelection] = useState("")
-  const [place, setPlace] = useState("")
-  const [frequency, setFrequency] = useState("")
+  const [state, setState] = useState<SurveyState>(defaultState)
+  const [stepIndex, setStepIndex] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [streamingText, setStreamingText] = useState("")
-  const [charCount, setCharCount] = useState(0)
   const [statusLabel, setStatusLabel] = useState("대기 중")
   const [error, setError] = useState<string | null>(null)
   const [canRetry, setCanRetry] = useState(false)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
 
-  function resetForm() {
-    setGenres([])
-    setBookKeywords("")
-    setTime("")
-    setStyle("")
-    setPurpose("")
-    setSelection("")
-    setPlace("")
-    setFrequency("")
-    setStreamingText("")
-    setCharCount(0)
-    setStatusLabel("대기 중")
-    setError(null)
-    setCanRetry(false)
+  useEffect(() => {
+    const draft = localStorage.getItem("personaSurveyDraft")
+    if (!draft) return
+    try {
+      const parsed = JSON.parse(draft) as { state: SurveyState; stepIndex: number }
+      if (parsed.state) setState(parsed.state)
+      if (typeof parsed.stepIndex === "number") setStepIndex(parsed.stepIndex)
+    } catch {
+      localStorage.removeItem("personaSurveyDraft")
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem("personaSurveyDraft", JSON.stringify({ state, stepIndex }))
+  }, [state, stepIndex])
+
+  const step = steps[stepIndex]
+  const isLastStep = stepIndex === steps.length - 1
+  const isStepValid = step.isValid(state)
+
+  const setPartialState = (next: Partial<SurveyState>) => {
+    setState((prev) => ({ ...prev, ...next }))
   }
 
-  const canSubmit = useMemo(() => {
-    return (
-      genres.length > 0 &&
-      bookKeywords.trim().length > 0 &&
-      time &&
-      style &&
-      purpose &&
-      selection &&
-      place &&
-      frequency
-    )
-  }, [genres, bookKeywords, time, style, purpose, selection, place, frequency])
+  const payload = useMemo(() => {
+    return {
+      genres: state.genres,
+      book_keywords: state.bookKeywords.split(",").map((item) => item.trim()).filter(Boolean),
+      time: state.time,
+      style: state.style,
+      purpose: state.purpose,
+      selection: state.selection,
+      place: state.place,
+      frequency: state.frequency
+    }
+  }, [state])
 
-  function toggleGenre(option: string) {
-    setGenres((prev) => (prev.includes(option) ? prev.filter((g) => g !== option) : [...prev, option]))
+  function extractJson(text: string) {
+    const cleaned = text.replace(/```json|```/g, "").trim()
+    const start = cleaned.indexOf("{")
+    const end = cleaned.lastIndexOf("}")
+    if (start === -1 || end === -1 || end <= start) return null
+    return cleaned.slice(start, end + 1)
   }
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault()
-    if (!canSubmit || isSubmitting) return
-
+  async function handleSubmit() {
+    if (isSubmitting) return
     setIsSubmitting(true)
     setError(null)
-    setStreamingText("")
-    setCharCount(0)
+    setIsAnalyzing(true)
     setStatusLabel("분석 중")
     setCanRetry(false)
-
-    const payload = {
-      genres,
-      book_keywords: bookKeywords.split(",").map((item) => item.trim()).filter(Boolean),
-      time,
-      style,
-      purpose,
-      selection,
-      place,
-      frequency
-    }
 
     try {
       const res = await fetch("/api/analyze", {
@@ -113,13 +217,15 @@ export default function SurveyPage() {
         const { value, done } = await reader.read()
         if (done) break
         resultText += decoder.decode(value, { stream: true })
-        setStreamingText(resultText)
-        setCharCount(resultText.length)
       }
 
       let parsed: unknown
       try {
-        parsed = JSON.parse(resultText)
+        const jsonText = extractJson(resultText)
+        if (!jsonText) {
+          throw new Error("JSON 형식을 찾을 수 없습니다.")
+        }
+        parsed = JSON.parse(jsonText)
       } catch {
         throw new Error("결과 파싱에 실패했습니다. 다시 시도해주세요.")
       }
@@ -127,8 +233,9 @@ export default function SurveyPage() {
       localStorage.setItem("personaResult", JSON.stringify(parsed))
       localStorage.setItem(
         "personaMeta",
-        JSON.stringify({ genres, bookKeywords: payload.book_keywords })
+        JSON.stringify({ genres: state.genres, bookKeywords: payload.book_keywords })
       )
+      localStorage.removeItem("personaSurveyDraft")
       setStatusLabel("완료")
       router.push("/result")
     } catch (err) {
@@ -137,226 +244,182 @@ export default function SurveyPage() {
       setCanRetry(true)
     } finally {
       setIsSubmitting(false)
+      setIsAnalyzing(false)
     }
   }
 
+  function handleNext() {
+    if (!isStepValid) return
+    if (isLastStep) {
+      void handleSubmit()
+      return
+    }
+    setStepIndex((prev) => Math.min(prev + 1, steps.length - 1))
+  }
+
+  function handlePrev() {
+    setStepIndex((prev) => Math.max(prev - 1, 0))
+  }
+
+  function resetForm() {
+    setState(defaultState)
+    setStepIndex(0)
+    setStatusLabel("대기 중")
+    setError(null)
+    setCanRetry(false)
+    localStorage.removeItem("personaSurveyDraft")
+  }
+
+  const summaryChips = useMemo(() => {
+    const keywordChips = payload.book_keywords.slice(0, 3).map((item) => `#${item}`)
+    return [
+      ...state.genres,
+      state.time,
+      state.style,
+      state.purpose,
+      state.selection,
+      state.place,
+      state.frequency,
+      ...keywordChips
+    ].filter(Boolean)
+  }, [payload.book_keywords, state])
+
   return (
     <main>
-      <div className="mx-auto max-w-5xl px-6 pb-24 pt-16">
-        <div className="text-xs uppercase tracking-[0.35em] text-muted">Survey</div>
-        <h1 className="mt-3 text-3xl font-semibold">나만의 독서 페르소나 테스트</h1>
-        <p className="mt-3 max-w-xl text-sm text-muted">
-          모든 항목을 선택하면 바로 AI 분석이 시작됩니다.
-        </p>
+      <div className="mx-auto max-w-5xl px-6 pb-24 pt-16 page-enter">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="text-xs uppercase tracking-[0.35em] text-muted">Survey</div>
+            <h1 className="mt-3 text-3xl font-semibold">심심할 때 해보는 독서 페르소나</h1>
+            <p className="mt-3 max-w-xl text-sm text-muted">
+              가볍게 8문항만 고르면, 당신의 독서 캐릭터가 바로 등장합니다.
+            </p>
+          </div>
+          <div className="rounded-full border border-line bg-white px-4 py-2 text-xs text-muted">
+            {stepIndex + 1} / {steps.length}
+          </div>
+        </div>
 
-        <form className="mt-10 space-y-8" onSubmit={handleSubmit}>
-          <section className="rounded-3xl border border-line bg-card p-6 shadow-soft">
-            <h2 className="text-lg font-semibold">1. 선호 장르</h2>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {genreOptions.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => toggleGenre(option)}
-                  className={`rounded-full border px-4 py-2 text-sm ${
-                    genres.includes(option)
-                      ? "border-ink bg-ink text-white"
-                      : "border-line bg-[#f6f1ea] text-ink"
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
+        <div className="mt-6 flex flex-wrap items-center gap-2">
+          {summaryChips.length ? (
+            summaryChips.map((chip) => (
+              <span key={chip} className="rounded-full border border-line bg-white px-3 py-1 text-[11px] text-muted">
+                {chip}
+              </span>
+            ))
+          ) : (
+            <span className="text-xs text-muted">선택하면 여기 요약이 쌓여요.</span>
+          )}
+        </div>
+
+        <div className="mt-8 rounded-3xl border border-line bg-card p-6 shadow-soft fun-card">
+          <div className="mb-6 flex items-center gap-2">
+            {steps.map((_, idx) => (
+              <span
+                key={idx}
+                className={`h-2 w-10 rounded-full transition ${
+                  idx <= stepIndex ? "bg-ink" : "bg-[#efe8dd]"
+                }`}
+              />
+            ))}
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.3em] text-muted">
+                Step {stepIndex + 1}
+              </div>
+              <h2 className="mt-2 text-xl font-semibold">{step.title}</h2>
+              <p className="mt-2 text-sm text-muted">{step.description}</p>
             </div>
-          </section>
-
-          <section className="rounded-3xl border border-line bg-card p-6 shadow-soft">
-            <h2 className="text-lg font-semibold">2. 최근 인상 깊었던 책 키워드</h2>
-            <p className="mt-1 text-xs text-muted">쉼표로 구분해서 입력해주세요. 예: 고독, 성장, 데이터</p>
-            <input
-              value={bookKeywords}
-              onChange={(event) => setBookKeywords(event.target.value)}
-              className="mt-3 w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm"
-              placeholder="고독, 성장, 데이터"
-            />
-          </section>
-
-          <section className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-3xl border border-line bg-card p-6 shadow-soft">
-              <h2 className="text-lg font-semibold">3. 읽는 시간대</h2>
-              <div className="mt-4 space-y-2">
-                {timeOptions.map((option) => (
-                  <label key={option} className="flex items-center gap-3 text-sm">
-                    <input
-                      type="radio"
-                      name="time"
-                      value={option}
-                      checked={time === option}
-                      onChange={() => setTime(option)}
-                    />
-                    {option}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-line bg-card p-6 shadow-soft">
-              <h2 className="text-lg font-semibold">4. 읽는 방식</h2>
-              <div className="mt-4 space-y-2">
-                {styleOptions.map((option) => (
-                  <label key={option} className="flex items-center gap-3 text-sm">
-                    <input
-                      type="radio"
-                      name="style"
-                      value={option}
-                      checked={style === option}
-                      onChange={() => setStyle(option)}
-                    />
-                    {option}
-                  </label>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-3xl border border-line bg-card p-6 shadow-soft">
-              <h2 className="text-lg font-semibold">5. 독서 목적</h2>
-              <div className="mt-4 space-y-2">
-                {purposeOptions.map((option) => (
-                  <label key={option} className="flex items-center gap-3 text-sm">
-                    <input
-                      type="radio"
-                      name="purpose"
-                      value={option}
-                      checked={purpose === option}
-                      onChange={() => setPurpose(option)}
-                    />
-                    {option}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-line bg-card p-6 shadow-soft">
-              <h2 className="text-lg font-semibold">6. 책 선택 기준</h2>
-              <div className="mt-4 space-y-2">
-                {selectionOptions.map((option) => (
-                  <label key={option} className="flex items-center gap-3 text-sm">
-                    <input
-                      type="radio"
-                      name="selection"
-                      value={option}
-                      checked={selection === option}
-                      onChange={() => setSelection(option)}
-                    />
-                    {option}
-                  </label>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-3xl border border-line bg-card p-6 shadow-soft">
-              <h2 className="text-lg font-semibold">7. 독서 장소</h2>
-              <div className="mt-4 space-y-2">
-                {placeOptions.map((option) => (
-                  <label key={option} className="flex items-center gap-3 text-sm">
-                    <input
-                      type="radio"
-                      name="place"
-                      value={option}
-                      checked={place === option}
-                      onChange={() => setPlace(option)}
-                    />
-                    {option}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-line bg-card p-6 shadow-soft">
-              <h2 className="text-lg font-semibold">8. 독서 빈도</h2>
-              <div className="mt-4 space-y-2">
-                {frequencyOptions.map((option) => (
-                  <label key={option} className="flex items-center gap-3 text-sm">
-                    <input
-                      type="radio"
-                      name="frequency"
-                      value={option}
-                      checked={frequency === option}
-                      onChange={() => setFrequency(option)}
-                    />
-                    {option}
-                  </label>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <div className="rounded-3xl border border-line bg-card p-6 shadow-soft">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold">AI 분석 결과</div>
-                <div className="text-xs text-muted">
-                  제출하면 실시간으로 분석이 진행됩니다.
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="rounded-full border border-ink px-5 py-3 text-sm font-semibold text-ink"
-                  onClick={resetForm}
-                  disabled={isSubmitting}
-                >
-                  설문 초기화
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-full border border-ink bg-ink px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={!canSubmit || isSubmitting}
-                >
-                  {isSubmitting ? "분석 중..." : "분석 시작"}
-                </button>
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="mb-3 flex items-center gap-3 text-xs text-muted">
-                <div className="h-2 flex-1 rounded-full bg-[#efe8dd] shimmer-bar">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-accent to-accent2 transition-all"
-                    style={{ width: `${Math.min(100, 20 + charCount / 8)}%` }}
-                  />
-                </div>
-                <span>{statusLabel}</span>
-              </div>
-              <div className="min-h-[110px] rounded-2xl border border-line bg-white px-4 py-3 text-xs text-muted">
-                {error ? (
-                  error
-                ) : streamingText ? (
-                  <span>
-                    {streamingText}
-                    <span className="typing-cursor" />
-                  </span>
-                ) : (
-                  "결과가 여기에 스트리밍됩니다."
-                )}
-              </div>
-              {canRetry ? (
-                <div className="mt-3">
-                  <button
-                    type="button"
-                    className="rounded-full border border-ink px-5 py-2 text-xs font-semibold text-ink"
-                    onClick={handleSubmit}
-                  >
-                    다시 시도
-                  </button>
-                </div>
-              ) : null}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="rounded-full border border-line px-4 py-2 text-xs font-semibold text-muted"
+                onClick={resetForm}
+                disabled={isSubmitting}
+              >
+                초기화
+              </button>
             </div>
           </div>
-        </form>
+
+          <div key={step.id} className="step-enter">
+            {step.render ? (
+              step.render(state, setPartialState)
+            ) : (
+              <div className="mt-6 grid gap-2">
+                {(step.options ?? []).map((option) => (
+                  <label
+                    key={option}
+                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition ${
+                      state[step.id as keyof SurveyState] === option
+                        ? "border-ink bg-ink text-white"
+                        : "border-line bg-white/70 text-ink hover:border-ink"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name={step.id}
+                      value={option}
+                      checked={state[step.id as keyof SurveyState] === option}
+                      onChange={() => setPartialState({ [step.id]: option } as Partial<SurveyState>)}
+                      className="hidden"
+                    />
+                    {option}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+            <button
+              type="button"
+              className="rounded-full border border-line px-5 py-3 text-sm font-semibold text-muted disabled:opacity-50"
+              onClick={handlePrev}
+              disabled={stepIndex === 0 || isSubmitting}
+            >
+              이전
+            </button>
+            <button
+              type="button"
+              className="rounded-full border border-ink bg-ink px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={handleNext}
+              disabled={!isStepValid || isSubmitting}
+            >
+              {isLastStep ? "분석 시작" : "다음"}
+            </button>
+          </div>
+        </div>
+
+        {error ? (
+          <div className="mt-8 rounded-3xl border border-red-200 bg-red-50 p-5 text-sm text-red-600">
+            {error}
+            {canRetry ? (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  className="rounded-full border border-red-300 px-5 py-2 text-xs font-semibold text-red-600"
+                  onClick={handleSubmit}
+                >
+                  다시 시도
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {isAnalyzing ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
+            <div className="w-full max-w-sm rounded-3xl border border-line bg-white p-8 text-center shadow-soft">
+              <div className="mx-auto h-14 w-14 animate-spin rounded-full border-4 border-line border-t-ink" />
+              <h3 className="mt-4 text-lg font-semibold">페르소나 분석 중...</h3>
+              <p className="mt-2 text-sm text-muted">
+                귀여운 캐릭터가 곧 등장할 거예요.
+              </p>
+            </div>
+          </div>
+        ) : null}
       </div>
     </main>
   )

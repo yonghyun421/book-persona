@@ -9,6 +9,7 @@ type ShareInput = {
   keywords: string[]
   genres?: string[]
   backgroundDataUrl?: string
+  ratio?: "1:1" | "4:5" | "9:16"
 }
 
 export async function POST(req: Request) {
@@ -22,6 +23,7 @@ export async function POST(req: Request) {
     keywords: input.keywords ?? [],
     genres: input.genres ?? [],
     background_data_url: input.backgroundDataUrl ?? null,
+    ratio: input.ratio ?? "1:1",
     created_at: new Date().toISOString(),
     expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString()
   }
@@ -45,7 +47,7 @@ export async function GET(req: Request) {
 
   const { data, error } = await supabase
     .from("book_persona_share")
-    .select("id,title,subtitle,keywords,genres,background_data_url,expires_at")
+    .select("id,title,subtitle,keywords,genres,background_data_url,expires_at,ratio")
     .eq("id", id)
     .maybeSingle()
 
@@ -61,6 +63,7 @@ export async function GET(req: Request) {
     subtitle: data.subtitle,
     keywords: data.keywords ?? [],
     genres: data.genres ?? [],
-    backgroundDataUrl: data.background_data_url ?? undefined
+    backgroundDataUrl: data.background_data_url ?? undefined,
+    ratio: data.ratio ?? "1:1"
   })
 }

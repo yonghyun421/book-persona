@@ -11,6 +11,7 @@ async function getShare(id: string) {
     subtitle: string
     keywords: string[]
     genres: string[]
+    ratio?: "1:1" | "4:5" | "9:16"
   }
 }
 
@@ -52,7 +53,10 @@ export default async function ShareByIdPage({ params }: { params: { id: string }
     )
   }
 
-  const ogImageUrl = `/api/share-card?id=${data.id}`
+  const ogImageUrl = `/api/share-card?id=${data.id}&ratio=${data.ratio ?? "1:1"}`
+  const ratio = data.ratio ?? "1:1"
+  const ratioClass =
+    ratio === "1:1" ? "aspect-square" : ratio === "4:5" ? "aspect-[4/5]" : "aspect-[9/16]"
 
   return (
     <main>
@@ -61,9 +65,9 @@ export default async function ShareByIdPage({ params }: { params: { id: string }
         <h1 className="mt-3 text-3xl font-semibold">{data.title}</h1>
         <p className="mt-3 max-w-2xl text-sm text-muted">{data.subtitle}</p>
 
-        <div className="mt-8 overflow-hidden rounded-3xl border border-line bg-card shadow-soft">
+        <div className={`mt-8 overflow-hidden rounded-3xl border border-line bg-card shadow-soft ${ratioClass}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={ogImageUrl} alt="" className="h-auto w-full" />
+          <img src={ogImageUrl} alt="" className="h-full w-full object-cover" />
         </div>
 
         <div className="mt-8 rounded-3xl border border-line bg-card p-6 shadow-soft">
